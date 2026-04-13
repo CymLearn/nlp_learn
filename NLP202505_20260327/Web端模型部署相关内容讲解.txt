@@ -1,0 +1,352 @@
+NOTE: 一般情况下，我们可以通过对外提供一个http接口完成部署操作，这个http接口接收调用方传递过来的参数(特征数据)，内部调用模型进行预测推理，并将预测结果返回调用方
+一般情况下，模型部署的流程如下:
+    -1-. 训练好模型后，首先编写好样本的推理预测相关的方法，主要包括两个方法:
+        模型恢复的相关方法：推理对象的构造方法，eg:__init__
+        模型预测方法：接收入参，入参处理，调用模型，结果处理返回
+    -2-. 在推理预测代码的外部套一层"壳"，这层"壳"相关的代码就是一些接收调用方传递特征数据、调用预测代码等相关逻辑
+        eg: 本地测试的命令行输入、HTTP接口(Flask、FastAPI)、RPC接口......-->具体看公司的整体技术框架
+    -3-. 相关的测试工作 --> 自己本地的一些测试
+    -4-. 选择不同的部署方式，将代码 + 模型文件上传进行部署操作
+        eg: 裸服务器的部署、Docker镜像部署、各种第三方的人工智能平台的部署....
+        PS: 一般情况下仅需要编写一个Docker项目配置文件(Dockerfile)
+        PS: 代码一般情况下使用git进行管理
+    -5-. 部署好的服务进行测试check，输出一些文档即可
+===============================================================
+Linux
+    NOTE: 在企业中，一般linux服务器是运维工作人员给你的。一般情况下，会给定IP地址、SSH端口号、用户名、密码；如果学习或者在公司没有提供的时候，可以自行到各种云平台上进行购买使用。
+    NOTE: 常用的两个工具: WinSCP(非常方面的将本地文件上传到linux服务器或者从linux服务器下载文件到本地)、putty(可以通过命令行在服务器上进行命令操作)
+    参考：
+        https://ecs.console.aliyun.com/home#/
+        https://winscp.net/eng/docs/lang:chs
+        https://www.putty.org/
+        https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html
+        https://the.earth.li/~sgtatham/putty/latest/w64/putty.zip
+        https://www.runoob.com/linux/linux-command-manual.html
+        https://www.runoob.com/w3cnote/linux-useful-command.html
+    常用命令:
+        系统命令：ps、grep、kill、ls、cd、cat、mv、rm、vim、cp、mkdir、wget....
+        软件命令：conda、python、pip....
+========================================================
+HTTP相关内容介绍：
+    参考：
+        https://www.runoob.com/http/http-methods.html
+        https://www.runoob.com/html/html-url.html
+    URL路径的解析:
+        https://github.com[:port]/pallets/flask[?k1=v1&k2=v2]
+            https: 协议schema，eg: http、https
+            github.com: 服务器位置，域名、主机名或者ip地址
+            /pallets/flask: 资源路径/路由，最终决定具体由那个方法处理当前请求
+            port: 可选端口，默认http 80, https 443
+            ?k1=v1&k2=v2: get请求时候的参数,此时表示有两个参数k1和k2
+        HTTP的请求方式主要有Get、Post
+    特殊IP地址:
+        0.0.0.0: 表达当前机器的所有IP地址，但是不支持互联网访问0.0.0.0
+        127.0.0.1: 当前机器的IP地址
+========================================================
+Flask
+    参考：
+        https://pypi.org/project/Flask/
+        https://github.com/pallets/flask
+        https://flask.palletsprojects.com/en/stable/
+        https://flask.palletsprojects.com/zh-cn/stable/
+        https://docs.jinkan.org/docs/flask/
+    安装命令：
+        pip install Flask==3.1.1
+    操作：
+        1. 首先弄一个Demo，运行看看：在官网的帮助文档中找quickstart
+        2. 了解一些基本概念:
+            @app.route: 给定一个资源请求路径，也就是路由
+            @app.route('/predict', methods=['GET', 'POST'])
+            text = request.args.get('text')
+            text = request.form.get('text')
+            jsonify({'code': 0, 'msg': '成功', 'data': pred_result})
+========================================================
+基于HTTP API接口 + 裸Linux服务器部署
+    参考：
+        https://www.runoob.com/linux/linux-command-manual.html
+    准备工作：准备一台linux服务器(实际工作的时候，运维会给你的)、下载一些软件WinSCP(可以负责将windows的文件上传到Linux上) + Putty(SSH远程连接的工具)
+    步骤：
+        1. 通过WinSCP将windows上的代码上传到linux服务器上，放到某个文件夹中即可
+        2. 安装Python环境以及依赖库
+            wget https://repo.anaconda.com/miniconda/Miniconda3-py310_24.9.2-0-Linux-x86_64.sh
+            sh Miniconda3-py310_24.9.2-0-Linux-x86_64.sh
+            pip install flask==3.1.1 flask-cors torch==2.3.1 transformers==4.57.3 jieba
+        3. 在linux命令行中启动web服务
+            # 进入代码所在文件夹
+            cd /root/deploy_nlp/text_classify/test
+            # 启动服务
+            python server_runner.py
+            ## PS: 启动服务之后，需要注意服务器的防火墙(服务器是否允许公网IP的访问以及允许那些端口的访问)
+            ## 建议启动方式：启动服务器，应该后台运行最好
+                nohup python server_runner.py &
+        4. 测试
+            # 查看进程是否存在
+            ps -ef | grep python
+(base) root@iZbp1go9moi8408vjeikjiZ:~/deploy_nlp/text_classify/test# ps -ef | grep python
+root         895       1  0 22:01 ?        00:00:00 /usr/bin/python3 /usr/bin/networkd-dispatcher --run-startup-triggers
+root         965       1  0 22:01 ?        00:00:00 /usr/bin/python3 /usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal
+root        1078       1  0 22:01 ?        00:00:00 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root        4595    4384  2 22:15 pts/2    00:00:04 python server_runner.py
+root        4693    4652  0 22:18 pts/0    00:00:00 grep --color=auto python
+
+            # 通过curl命令访问测试接口
+            curl http://127.0.0.1:5000
+        5. 客户端访问
+            通过python/java/....语言的http访问库进行访问
+========================================================
+fastapi
+    功能：和Flask类似，可以用来实现算法接口，但是不一样的点在于：FastAPI更适合实现流式数据返回的接口
+    参考:
+        https://pypi.org/project/fastapi/0.109.0/
+        https://fastapi.tiangolo.com/
+        https://github.com/fastapi/fastapi
+        https://www.uvicorn.org/
+        https://fastapi.tiangolo.com/async/#in-a-hurry
+    安装命令:
+        pip install fastapi==0.109.0
+    操作：
+        1. 首先弄一个Demo，运行看看：在官网的帮助文档中找quickstart/examples...
+        2. 了解基本概念:
+            get、post请求资源的定义
+            参数的获取
+            结果的返回
+========================================================
+Docker
+    简单来理解的话，可以将Docker看成是一种比较方便进行部署、运维管理的软件
+        image/镜像：理解成是一个包含某个服务/功能的安装包，内部包含了操作系统、服务/功能软件;
+        镜像仓库：用来保存构建好的image/镜像的网站；
+        container/容器：一个image镜像在docker软件中运行后最终形成的"微小的服务器" --> 其实就是一个进程
+        宿主机：运行container容器的服务器/机器
+    参考：
+        https://dockerdocs.org/
+        https://www.runoob.com/docker/ubuntu-docker-install.html
+        https://www.runoob.com/docker/docker-command-manual.html
+        https://hub.docker.com/
+    安装：可以直接选择阿里云默认支持的Docker容器的服务器
+    Docker阿里云镜像加速:
+            https://cr.console.aliyun.com/cn-hangzhou/instances/mirrors
+sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json <<-'EOF'
+{
+"registry-mirrors": [
+    "https://0vmzj3q6.mirror.aliyuncs.com",
+    "https://fkphdehx.mirror.aliyuncs.com",
+    "https://docker.m.daocloud.io",
+    "https://dockerproxy.com",
+    "https://registry.docker-cn.com",
+    "https://docker.mirrors.ustc.edu.cn",
+    "https://hub-mirror.c.163.com",
+    "https://hub.uuuadc.top",
+    "https://docker.anyhub.us.kg",
+    "https://dockerhub.jobcher.com",
+    "https://dockerhub.icu",
+    "https://docker.ckyl.me",
+    "https://docker.awsl9527.cn",
+    "https://mirror.baidubce.com"
+  ]
+}
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+    常见命令:
+        docker相关命令: https://www.runoob.com/docker/docker-command-manual.html
+        docker ps
+        docker images
+        docker run
+        docker pull
+        docker push
+        docker build
+    分步骤构建docker镜像并启动服务:
+        NOTE:
+            宿主机：Docker软件运行的机器 或者 容器运行的机器
+            容器：Docker启动的镜像所形成的容器
+        1. 拉取基础镜像(宿主机内执行)
+            去镜像仓库进行检索:
+                https://hub.docker.com/
+            docker pull python:3.12
+        2. 运行镜像，形成容器，并且进入容器内部(宿主机内执行)
+            docker run -ti python:3.12 /bin/bash
+            run命令会进入docker容器内部，在容器内部就相当在一个操作系统里面，你可以在操作系统内进行你想操作的任何内容， exit就是推出镜像
+            重新启动退出关闭的容器
+            docker restart <CONTAINER ID>
+            # 重新进入容器内部
+            docker exec -ti <CONTAINER ID> /bin/bash
+        3. 在容器内部进行依赖库的安装(容器内执行)
+            pip install flask==3.1.1 flask-cors==6.0.2 transformers==4.57.3 jieba onnxruntime==1.22.0 fastapi==0.109.0 uvicorn==0.40.0 -i http://mirrors.cloud.aliyuncs.com/pypi/simple/ --trusted-host mirrors.cloud.aliyuncs.com
+        4. 将模型代码及模型文件从宿主机中copy到容器里面（宿主机里面执行）
+            docker cp <宿主机源路径> <容器id>:<容器内部目标路径>
+            docker cp text_classify ee65d5ac0660:/opt/text_classify
+        5. 复制代码及模型完成后，可以在容器内部测试一下代码环境是否正常(容器内执行)
+            # 启动服务
+            python /opt/text_classify/test/server_runner.py
+            # 使用docker exec命令重新启动一个界面，进行测试
+            curl http://127.0.0.1:9991
+            # 如果成功的情况下，直接退出容器；如果失败，那么针对失败内容进行解决
+            exit
+        6. 将容器转换为镜像(宿主机中执行)
+            docker commit <容器id> <镜像名称>:<镜像版本>
+            docker commit ee65d5ac0660 nlp_text_classify:v2601092109
+        7. 启动镜像(宿主机执行)
+            docker run -d -p 9001:9001 nlp_text_classify:v2601092109 python /opt/text_classify/test/server_runner.py
+            docker run -d -p 9002:9001 nlp_text_classify:v2601092109 python /opt/text_classify/test/server_runner.py
+            docker run -d -p 9003:9001 nlp_text_classify:v2601092109 python /opt/text_classify/test/server_runner.py
+        ------------ 上述docker相关代码合并
+            # 宿主机执行
+            docker run -ti python:3.12 /bin/bash
+
+            # 容器执行
+            pip install flask==3.1.1 flask-cors==6.0.2 transformers==4.57.3 jieba onnxruntime==1.22.0 fastapi==0.109.0 uvicorn==0.40.0 -i http://mirrors.cloud.aliyuncs.com/pypi/simple/ --trusted-host mirrors.cloud.aliyuncs.com
+
+            # 宿主机执行
+            docker ps
+            docker cp text_classify ee65d5ac0660:/opt/text_classify
+
+            # 容器执行
+            exit
+
+            # 宿主机执行
+            docker commit ee65d5ac0660 nlp_text_classify:v2601092109
+
+            # 宿主机执行
+            docker images
+            docker run -d -p 9003:9001 nlp_text_classify:v2601092109 python /opt/text_classify/test/server_runner.py
+========================================================
+Docker Dockerfile镜像构建
+    1. 找一个docker镜像仓库
+        https://hub.docker.com/
+        https://cr.console.aliyun.com/
+        登录：
+            sudo docker login --username=19410*****@qq.com registry.cn-shenzhen.aliyuncs.com
+        操作镜像：
+            docker pull registry.cn-shenzhen.aliyuncs.com/gerry_ai/deploy:[镜像版本号]
+            docker login --username=19410*****@qq.com registry.cn-shenzhen.aliyuncs.com
+            docker tag [ImageId] registry.cn-shenzhen.aliyuncs.com/gerry_ai/deploy:[镜像版本号]
+            docker push registry.cn-shenzhen.aliyuncs.com/gerry_ai/deploy:[镜像版本号]
+            docker run -d -p 5000:9001 registry.cn-shenzhen.aliyuncs.com/gerry_ai/deploy:01092151 python /opt/text_classify/test/server_runner.py
+
+            docker tag f3396041c12d registry.cn-shenzhen.aliyuncs.com/gerry_ai/deploy:python_3.12
+            docker push registry.cn-shenzhen.aliyuncs.com/gerry_ai/deploy:python_3.12
+    2. 编写Dockerfile文件内容
+        https://www.runoob.com/docker/docker-dockerfile.html
+        a. 编写好Dockerfile文件并上传到linux服务器上(Docker宿主机中)
+        b. 在Dockerfile所在文件夹下执行下列命令，来构建docker镜像
+            docker build -t registry.cn-shenzhen.aliyuncs.com/gerry_ai/deploy:v01092208 .
+        c. 测试
+            docker run -d -p 9003:9001 registry.cn-shenzhen.aliyuncs.com/gerry_ai/deploy:v01092208
+        d. 将build好的镜像上传到镜像仓库
+            docker push registry.cn-shenzhen.aliyuncs.com/gerry_ai/deploy:v01092208
+    3. 在任何一台安装好docker软件的服务器上均可以启动模型推理服务(必须有访问镜像仓库的权限)
+        docker run -d -p 9003:9001 registry.cn-shenzhen.aliyuncs.com/gerry_ai/deploy:v01092208
+=====================================================
+Git:
+    功能：代码管理
+    参考：
+        https://www.runoob.com/git/git-tutorial.html
+        https://git-scm.com/downloads
+        https://devops.console.aliyun.com/overview
+    相关命令:
+        git clone xxxx: 从远程(代码源/代码管理仓库)下载代码到本地
+        git push: 上传本地的代码到远程
+        git pull: 从远程拉取当前分支的最新代码
+--------------------
+# 部署脚本会在部署组的每台机器上执行。一个典型Docker部署脚本如下：
+#示例中使用的$image是您在脚本下方的变量处定义的变量（上游输出或自定义）
+#docker run $image
+CID=$(docker ps | grep text_classify_app | grep -v grep | awk '{print $1}')
+if [ -n "$CID" ]; then
+    docker stop text_classify_app
+fi
+docker run -d --rm -p 9999:9001 --name text_classify_app -t $image
+--------------------
+========================================================
+基于第三方的人工智能的平台进行部署
+    eg: 阿里云的PAI-EAS、AWS的Sagemaker
+    以EAS为例
+        https://pai.console.aliyun.com/
+        https://help.aliyun.com/zh/pai/user-guide/eas-model-serving/?spm=5176.pai-console-inland.help.dexternal.32de642d1ofCVZ
+        https://help.aliyun.com/zh/pai/user-guide/develop-custom-processors-by-using-python?spm=a2c4g.11186623.0.i8
+        https://help.aliyun.com/zh/pai/user-guide/sdk-for-python?spm=a2c4g.11186623.0.i18
+    步骤：
+        a. 编写PAI EAS的入口代码文件: pai_app.py
+        b. 将代码/模型上传到oss上，建议结构如下:
+            xxxxx/                  根文件夹
+            xxxxx/code              保存所有相关的代码(PAI-EAS会自动将这个文件夹添加到sys.path中)
+            xxxxx/models            保存所有的模型文件
+            NOTE: 先开通OSS，然后创建bucket，最后创建好根文件夹后上传对应的文件
+                https://oss.console.aliyun.com/
+        c. 在oss对应地域的PAI-EAS上进行模型部署
+---------
+{
+  "cloud": {
+    "computing": {
+      "disable_spot_protection_period": true,
+      "instances": [
+        {
+          "spot_price_limit": 0.06,
+          "type": "ecs.c7a.large"
+        }
+      ]
+    }
+  },
+  "containers": [
+    {
+      "env": [
+        {
+          "name": "MODEL_DIR",
+          "value": "/mnt/models/"
+        },
+        {
+          "name": "PAI_ENDPOINT",
+          "value": "0.0.0.0:8000"
+        }
+      ],
+      "image": "eas-registry-vpc.cn-shenzhen.cr.aliyuncs.com/pai-eas/python-inference:py39-ubuntu2004",
+      "port": 8000,
+      "prepare": {
+        "pythonRequirements": [
+          "transformers==4.57.3",
+          "jieba",
+          "onnxruntime==1.22.0"
+        ]
+      },
+      "script": "python /mnt/codes/pai_app.py"
+    }
+  ],
+  "metadata": {
+    "cpu": 2,
+    "instance": 1,
+    "memory": 4000,
+    "name": "text_classify_nlp0114",
+    "workspace_id": "16062"
+  },
+  "storage": [
+    {
+      "mount_path": "/mnt/codes/",
+      "oss": {
+        "path": "oss://ai-shenzhen/text_classify_pai_eas/20260114215400/code/",
+        "readOnly": false
+      }
+    },
+    {
+      "mount_path": "/mnt/models/",
+      "oss": {
+        "path": "oss://ai-shenzhen/text_classify_pai_eas/20260114215400/models/",
+        "readOnly": false
+      }
+    }
+  ]
+}
+----------------
+    d. 测试
+        入参: {"text":"从张家界怎么去慈利，帮我规划一下路线", "top_k":5}
+        d.1 页面测试
+        d.2 http测试
+            curl http://1757826125271350.cn-shenzhen.pai-eas.aliyuncs.com/api/predict/text_classify_nlp0114 -H 'Authorization: NDFlNTIxNmQ0OTcwZmI5ZGQ0OWEwZmM4NGRkMzA0NTdmMzdiNzJjMA==' -d '{"text":"从张家界怎么去慈利，帮我规划一下路线", "top_k":5}'
+        d3. 通过客户端测试
+            https://help.aliyun.com/zh/pai/user-guide/sdk-for-python?spm=a2c4g.11186623.0.i18
+
+
+
+
+
+
